@@ -8,6 +8,11 @@ interface SequenceListProps {
     startIndex: number;
 }
 
+interface SaveFilePickerOptions {
+    suggestedName?: string;
+    types?: Array<{ description: string; accept: Record<string, string[]> }>;
+}
+
 const SequenceList: React.FC<SequenceListProps> = React.memo(({ items, x0, startIndex }) => (
     <div className="sequence-list">
         {items.map((num, idx) => (
@@ -86,13 +91,12 @@ export const LabOne = () => {
         const content = `${metrics}\n\nSequence:\n${sequence}`;
 
         try {
-            if ("showSaveFilePicker" in window) {
-                const options = {
+            if ("showSaveFilePicker" in globalThis) {
+                const options: SaveFilePickerOptions = {
                     suggestedName: "generated-sequence.txt",
                     types: [{ description: "Text file", accept: { "text/plain": [".txt"] } }]
                 };
-                // @ts-ignore
-                const handle = await window.showSaveFilePicker(options);
+                const handle = await (globalThis as any).showSaveFilePicker(options);
                 const writable = await handle.createWritable();
                 await writable.write(content);
                 await writable.close();

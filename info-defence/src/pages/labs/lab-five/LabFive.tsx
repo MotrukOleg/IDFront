@@ -5,9 +5,6 @@ import {
     getAvailableKeys,
     downloadKey,
     deleteKey,
-    getPublicKey,
-    getPrivateKey,
-    getKeysStatus,
     loadKeyFromServer,
     importKey,
     importKeyFromFile,
@@ -21,12 +18,28 @@ import "./LabFive.css";
 
 type TabType = 'keys' | 'sign' | 'verify';
 
+interface KeysStatus {
+    hasPublicKey: boolean;
+    hasPrivateKey: boolean;
+}
+
+interface VerificationResult {
+    isValid: boolean;
+    message?: string;
+}
+
+interface ApiResponse {
+    success?: boolean;
+    message?: string;
+    [key: string]: unknown;
+}
+
 export const LabFive = () => {
     const [activeTab, setActiveTab] = useState<TabType>('keys');
     const [publicKeyFileName, setPublicKeyFileName] = useState('');
     const [privateKeyFileName, setPrivateKeyFileName] = useState('');
     const [availableKeys, setAvailableKeys] = useState<string[]>([]);
-    const [keysStatus, setKeysStatus] = useState<any>(null);
+    const [keysStatus, setKeysStatus] = useState<KeysStatus | null>(null);
     const [importKeyContent, setImportKeyContent] = useState('');
     const [importKeyFile, setImportKeyFile] = useState<File | null>(null);
     const [isPrivateKeyImport, setIsPrivateKeyImport] = useState(false);
@@ -34,12 +47,12 @@ export const LabFive = () => {
     const [signatureHex, setSignatureHex] = useState('');
     const [textToVerify, setTextToVerify] = useState('');
     const [signatureHexToVerify, setSignatureHexToVerify] = useState('');
-    const [verificationResult, setVerificationResult] = useState<any>(null);
+    const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
     const [fileToSign, setFileToSign] = useState<File | null>(null);
     const [fileSignatureHex, setFileSignatureHex] = useState('');
     const [fileToVerify, setFileToVerify] = useState<File | null>(null);
     const [fileSignatureHexToVerify, setFileSignatureHexToVerify] = useState('');
-    const [fileVerificationResult, setFileVerificationResult] = useState<any>(null);
+    const [fileVerificationResult, setFileVerificationResult] = useState<VerificationResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
@@ -48,100 +61,104 @@ export const LabFive = () => {
         loadKeysAndStatus();
     }, []);
 
-    const clearMessages = () => {
+    const clearMessages = (): void => {
         setError(null);
         setSuccess(null);
     };
 
-    const loadKeysAndStatus = async () => {
+    const loadKeysAndStatus = async (): Promise<void> => {
         try {
             const keysResult = await getAvailableKeys();
             if ('files' in keysResult) {
-                setAvailableKeys(keysResult.files);
+                setAvailableKeys(keysResult.files as string[]);
             }
             const statusResult = await getKeysStatus();
             if ('hasPublicKey' in statusResult) {
-                setKeysStatus(statusResult);
+                setKeysStatus(statusResult as KeysStatus);
             }
         } catch (err) {
             console.error('Error loading keys:', err);
         }
     };
 
-    const handleGenerateKeys = async (e: React.FormEvent) => {
+    const handleGenerateKeys = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
         clearMessages();
         setLoading(true);
         try {
-            const result = await generateKeys({
+            const result = (await generateKeys({
                 publicKeyFileName: publicKeyFileName || undefined,
                 privateKeyFileName: privateKeyFileName || undefined
-            });
+            })) as ApiResponse;
             if ('success' in result && result.success) {
-                setSuccess(result.message || 'Keys generated successfully');
+                setSuccess((result.message as string) || 'Keys generated successfully');
                 setPublicKeyFileName('');
                 setPrivateKeyFileName('');
                 await loadKeysAndStatus();
             } else {
-                setError('message' in result ? result.message : 'Key generation failed');
+                setError((result.message as string) || 'Key generation failed');
             }
-        } catch (err: any) {
-            setError(`Error: ${err.message}`);
+        } catch (err: unknown) {
+            const error = err as Error;
+            setError(`Error: ${error.message}`);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleLoadKey = async (fileName: string, isPrivate: boolean) => {
+    const handleLoadKey = async (fileName: string, isPrivate: boolean): Promise<void> => {
         clearMessages();
         setLoading(true);
         try {
-            const result = await loadKeyFromServer({ fileName, isPrivateKey: isPrivate });
+            const result = (await loadKeyFromServer({ fileName, isPrivateKey: isPrivate })) as ApiResponse;
             if ('success' in result && result.success) {
-                setSuccess(result.message || `${isPrivate ? 'Private' : 'Public'} key loaded successfully`);
+                setSuccess((result.message as string) || `${isPrivate ? 'Private' : 'Public'} key loaded successfully`);
                 await loadKeysAndStatus();
             } else {
-                setError('message' in result ? result.message : 'Load key failed');
+                setError((result.message as string) || 'Load key failed');
             }
-        } catch (err: any) {
-            setError(`Error: ${err.message}`);
+        } catch (err: unknown) {
+            const error = err as Error;
+            setError(`Error: ${error.message}`);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleDownloadKey = async (fileName: string) => {
+    const handleDownloadKey = async (fileName: string): Promise<void> => {
         try {
-            const result = await downloadKey(fileName);
+            const result = (await downloadKey(fileName)) as ApiResponse & { blob?: Blob; fileName?: string };
             if (result.success && result.blob) {
-                downloadBlob(result.blob, result.fileName!);
+                downloadBlob(result.blob, result.fileName || fileName);
                 setSuccess("Key downloaded successfully");
             } else {
-                setError(result.message || "Download failed");
+                setError((result.message as string) || "Download failed");
             }
-        } catch (err: any) {
-            setError(`Error: ${err.message}`);
+        } catch (err: unknown) {
+            const error = err as Error;
+            setError(`Error: ${error.message}`);
         }
     };
 
-    const handleDeleteKey = async (fileName: string) => {
+    const handleDeleteKey = async (fileName: string): Promise<void> => {
         if (!confirm(`Are you sure you want to delete ${fileName}?`)) {
             return;
         }
         try {
-            const result = await deleteKey(fileName);
+            const result = (await deleteKey(fileName)) as ApiResponse;
             if ('success' in result && result.success) {
-                setSuccess(result.message || 'Key deleted successfully');
+                setSuccess((result.message as string) || 'Key deleted successfully');
                 await loadKeysAndStatus();
             } else {
-                setError('message' in result ? result.message : 'Delete failed');
+                setError((result.message as string) || 'Delete failed');
             }
-        } catch (err: any) {
-            setError(`Error: ${err.message}`);
+        } catch (err: unknown) {
+            const error = err as Error;
+            setError(`Error: ${error.message}`);
         }
     };
 
-    const handleImportKey = async (e: React.FormEvent) => {
+    const handleImportKey = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
         if (!importKeyContent && !importKeyFile) {
             setError("Enter key content or select a file");
@@ -150,31 +167,32 @@ export const LabFive = () => {
         clearMessages();
         setLoading(true);
         try {
-            let result;
+            let result: ApiResponse;
             if (importKeyFile) {
-                result = await importKeyFromFile(importKeyFile, isPrivateKeyImport);
+                result = (await importKeyFromFile(importKeyFile, isPrivateKeyImport)) as ApiResponse;
             } else {
-                result = await importKey({
+                result = (await importKey({
                     keyContent: importKeyContent,
                     isPrivateKey: isPrivateKeyImport
-                });
+                })) as ApiResponse;
             }
             if ('success' in result && result.success) {
-                setSuccess(result.message || 'Key imported successfully');
+                setSuccess((result.message as string) || 'Key imported successfully');
                 setImportKeyContent('');
                 setImportKeyFile(null);
                 await loadKeysAndStatus();
             } else {
-                setError('message' in result ? result.message : 'Import failed');
+                setError((result.message as string) || 'Import failed');
             }
-        } catch (err: any) {
-            setError(`Error: ${err.message}`);
+        } catch (err: unknown) {
+            const error = err as Error;
+            setError(`Error: ${error.message}`);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSignText = async (e: React.FormEvent) => {
+    const handleSignText = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
         if (!textToSign) {
             setError("Enter text to sign");
@@ -183,21 +201,22 @@ export const LabFive = () => {
         clearMessages();
         setLoading(true);
         try {
-            const result = await signText({ text: textToSign });
+            const result = (await signText({ text: textToSign })) as ApiResponse & { signatureHex?: string };
             if ('signatureHex' in result) {
-                setSignatureHex(result.signatureHex);
+                setSignatureHex(result.signatureHex || '');
                 setSuccess("Text signed successfully");
             } else {
-                setError('message' in result ? result.message : 'Signing failed');
+                setError((result.message as string) || 'Signing failed');
             }
-        } catch (err: any) {
-            setError(`Error: ${err.message}`);
+        } catch (err: unknown) {
+            const error = err as Error;
+            setError(`Error: ${error.message}`);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSignFile = async (e: React.FormEvent) => {
+    const handleSignFile = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
         if (!fileToSign) {
             setError("Select a file to sign");
@@ -206,21 +225,22 @@ export const LabFive = () => {
         clearMessages();
         setLoading(true);
         try {
-            const result = await signFile(fileToSign);
+            const result = (await signFile(fileToSign)) as ApiResponse & { signatureHex?: string };
             if ('signatureHex' in result) {
-                setFileSignatureHex(result.signatureHex);
+                setFileSignatureHex(result.signatureHex || '');
                 setSuccess("File signed successfully");
             } else {
-                setError('message' in result ? result.message : 'File signing failed');
+                setError((result.message as string) || 'File signing failed');
             }
-        } catch (err: any) {
-            setError(`Error: ${err.message}`);
+        } catch (err: unknown) {
+            const error = err as Error;
+            setError(`Error: ${error.message}`);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleVerifyText = async (e: React.FormEvent) => {
+    const handleVerifyText = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
         if (!textToVerify || !signatureHexToVerify) {
             setError("Enter text and signature to verify");
@@ -229,24 +249,25 @@ export const LabFive = () => {
         clearMessages();
         setLoading(true);
         try {
-            const result = await verifyText({
+            const result = (await verifyText({
                 text: textToVerify,
                 signatureHex: signatureHexToVerify
-            });
+            })) as ApiResponse & VerificationResult;
             if ('isValid' in result) {
                 setVerificationResult(result);
                 setSuccess(result.isValid ? "Signature is valid!" : "Signature is invalid!");
             } else {
-                setError('message' in result ? result.message : 'Verification failed');
+                setError((result.message as string) || 'Verification failed');
             }
-        } catch (err: any) {
-            setError(`Error: ${err.message}`);
+        } catch (err: unknown) {
+            const error = err as Error;
+            setError(`Error: ${error.message}`);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleVerifyFile = async (e: React.FormEvent) => {
+    const handleVerifyFile = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
         if (!fileToVerify || !fileSignatureHexToVerify) {
             setError("Select a file and enter signature to verify");
@@ -255,21 +276,22 @@ export const LabFive = () => {
         clearMessages();
         setLoading(true);
         try {
-            const result = await verifyFile(fileToVerify, fileSignatureHexToVerify);
+            const result = (await verifyFile(fileToVerify, fileSignatureHexToVerify)) as ApiResponse & VerificationResult;
             if ('isValid' in result) {
                 setFileVerificationResult(result);
                 setSuccess(result.isValid ? "File signature is valid!" : "File signature is invalid!");
             } else {
-                setError('message' in result ? result.message : 'Verification failed');
+                setError((result.message as string) || 'Verification failed');
             }
-        } catch (err: any) {
-            setError(`Error: ${err.message}`);
+        } catch (err: unknown) {
+            const error = err as Error;
+            setError(`Error: ${error.message}`);
         } finally {
             setLoading(false);
         }
     };
 
-    const copyToClipboard = (text: string) => {
+    const copyToClipboard = (text: string): void => {
         navigator.clipboard.writeText(text).then(() => {
             setSuccess("Copied to clipboard");
         });
