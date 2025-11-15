@@ -11,6 +11,7 @@ export const Header = () => (
             <Link to="/labs/lab-one" className="app-header-link">Lab One</Link>
             <Link to="/labs/lab-two" className="app-header-link">Lab Two</Link>
             <Link to="/labs/lab-three" className="app-header-link">Lab Three</Link>
+            <Link to="/labs/lab-four" className="app-header-link">Lab Four</Link>
         </nav>
     </header>
 );

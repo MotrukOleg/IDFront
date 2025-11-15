@@ -13,6 +13,7 @@ export const Home = () => (
             <Link to="/labs/lab-two" className="home-page-link">Lab Two</Link>
             <Link to="/labs/lab-three" className="home-page-link">Lab Three</Link>
             <Link to="/labs/lab-four" className="home-page-link">Lab Four</Link>
+            <Link to="/labs/lab-five" className="home-page-link">Lab Five</Link>
         </div>
     </div>
 

@@ -5,6 +5,7 @@ import { LabOne } from '../../pages/labs/lab-one/LabOne';
 import { LabTwo } from "../../pages/labs/lab-two/LabTwo";
 import { LabThree } from '../../pages/labs/lab-three/LabThree';
 import { LabFour } from '../../pages/labs/lab-four/LabFour';
+import { LabFive } from '../../pages/labs/lab-five/LabFive';
 
 
 export const AppRouter = () => (
@@ -16,6 +17,7 @@ export const AppRouter = () => (
             <Route path="/labs/lab-two" element={<LabTwo />} />
             <Route path="/labs/lab-three" element={<LabThree />} />
             <Route path="/labs/lab-four" element={<LabFour />} />
+            <Route path="/labs/lab-five" element={<LabFive />} />
         </Routes>
     </BrowserRouter>
 
