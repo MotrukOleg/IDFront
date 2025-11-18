@@ -1,5 +1,4 @@
-﻿// src/pages/labs/lab-five/LabFive.tsx
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
     generateKeys,
     getAvailableKeys,
@@ -12,7 +11,10 @@ import {
     signFile,
     verifyText,
     verifyFile,
-    downloadBlob
+    downloadBlob,
+    saveSignatureToFile,
+    readSignatureFromFile,
+    getKeysStatus
 } from "../../../services/api/lab-five/labFiveService";
 import "./LabFive.css";
 
@@ -43,16 +45,25 @@ export const LabFive = () => {
     const [importKeyContent, setImportKeyContent] = useState('');
     const [importKeyFile, setImportKeyFile] = useState<File | null>(null);
     const [isPrivateKeyImport, setIsPrivateKeyImport] = useState(false);
+
+    // Text signing/verification state
     const [textToSign, setTextToSign] = useState('');
     const [signatureHex, setSignatureHex] = useState('');
     const [textToVerify, setTextToVerify] = useState('');
     const [signatureHexToVerify, setSignatureHexToVerify] = useState('');
     const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+
+    // File signing/verification state
     const [fileToSign, setFileToSign] = useState<File | null>(null);
     const [fileSignatureHex, setFileSignatureHex] = useState('');
     const [fileToVerify, setFileToVerify] = useState<File | null>(null);
     const [fileSignatureHexToVerify, setFileSignatureHexToVerify] = useState('');
     const [fileVerificationResult, setFileVerificationResult] = useState<VerificationResult | null>(null);
+
+    // NEW: Signature file handling state
+    const [textSignatureFile, setTextSignatureFile] = useState<File | null>(null);
+    const [fileSignatureFile, setFileSignatureFile] = useState<File | null>(null);
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
@@ -291,6 +302,50 @@ export const LabFive = () => {
         }
     };
 
+    // NEW: Save signature to file functions
+    const handleSaveTextSignature = (): void => {
+        if (!signatureHex) {
+            setError("No signature to save");
+            return;
+        }
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `text_signature_${timestamp}.sig`;
+        saveSignatureToFile(signatureHex, fileName);
+        setSuccess("Signature saved to file");
+    };
+
+    const handleSaveFileSignature = (): void => {
+        if (!fileSignatureHex) {
+            setError("No signature to save");
+            return;
+        }
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `file_signature_${timestamp}.sig`;
+        saveSignatureToFile(fileSignatureHex, fileName);
+        setSuccess("Signature saved to file");
+    };
+
+    // NEW: Load signature from file functions
+    const handleLoadTextSignatureFromFile = async (file: File): Promise<void> => {
+        try {
+            const signature = await readSignatureFromFile(file);
+            setSignatureHexToVerify(signature);
+            setSuccess("Signature loaded from file");
+        } catch (err) {
+            setError("Error reading signature file");
+        }
+    };
+
+    const handleLoadFileSignatureFromFile = async (file: File): Promise<void> => {
+        try {
+            const signature = await readSignatureFromFile(file);
+            setFileSignatureHexToVerify(signature);
+            setSuccess("Signature loaded from file");
+        } catch (err) {
+            setError("Error reading signature file");
+        }
+    };
+
     const copyToClipboard = (text: string): void => {
         navigator.clipboard.writeText(text).then(() => {
             setSuccess("Copied to clipboard");
@@ -503,12 +558,20 @@ export const LabFive = () => {
                                             className="labfive-textarea readonly"
                                             rows={6}
                                         />
-                                        <button
-                                            onClick={() => copyToClipboard(signatureHex)}
-                                            className="copy-btn"
-                                        >
-                                            Copy
-                                        </button>
+                                        <div className="button-group">
+                                            <button
+                                                onClick={() => copyToClipboard(signatureHex)}
+                                                className="copy-btn"
+                                            >
+                                                Copy
+                                            </button>
+                                            <button
+                                                onClick={handleSaveTextSignature}
+                                                className="save-btn"
+                                            >
+                                                Save to File
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -549,12 +612,20 @@ export const LabFive = () => {
                                             className="labfive-textarea readonly"
                                             rows={6}
                                         />
-                                        <button
-                                            onClick={() => copyToClipboard(fileSignatureHex)}
-                                            className="copy-btn"
-                                        >
-                                            Copy
-                                        </button>
+                                        <div className="button-group">
+                                            <button
+                                                onClick={() => copyToClipboard(fileSignatureHex)}
+                                                className="copy-btn"
+                                            >
+                                                Copy
+                                            </button>
+                                            <button
+                                                onClick={handleSaveFileSignature}
+                                                className="save-btn"
+                                            >
+                                                Save to File
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -589,6 +660,28 @@ export const LabFive = () => {
                                     placeholder="Paste signature in HEX format..."
                                     required
                                 />
+
+                                {/* NEW: Load signature from file */}
+                                <label htmlFor="textSignatureFile">Or load signature from file:</label>
+                                <input
+                                    id="textSignatureFile"
+                                    type="file"
+                                    accept=".sig,.txt"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            setTextSignatureFile(file);
+                                            handleLoadTextSignatureFromFile(file);
+                                        }
+                                    }}
+                                    className="labfive-file-input"
+                                />
+                                {textSignatureFile && (
+                                    <div className="file-info">
+                                        <strong>Signature File:</strong> {textSignatureFile.name}
+                                    </div>
+                                )}
+
                                 <button
                                     type="submit"
                                     disabled={loading}
@@ -631,6 +724,28 @@ export const LabFive = () => {
                                     placeholder="Paste signature in HEX format..."
                                     required
                                 />
+
+                                {/* NEW: Load signature from file */}
+                                <label htmlFor="fileSignatureFile">Or load signature from file:</label>
+                                <input
+                                    id="fileSignatureFile"
+                                    type="file"
+                                    accept=".sig,.txt"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            setFileSignatureFile(file);
+                                            handleLoadFileSignatureFromFile(file);
+                                        }
+                                    }}
+                                    className="labfive-file-input"
+                                />
+                                {fileSignatureFile && (
+                                    <div className="file-info">
+                                        <strong>Signature File:</strong> {fileSignatureFile.name}
+                                    </div>
+                                )}
+
                                 <button
                                     type="submit"
                                     disabled={loading}

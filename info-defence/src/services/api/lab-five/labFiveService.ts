@@ -1,4 +1,3 @@
-// src/services/api/lab-five/labFiveService.ts
 import axios from "axios";
 
 const API_URL = "http://localhost:5000/api/labfive/";
@@ -334,6 +333,24 @@ export async function verifyFile(file: File, signatureHex: string): Promise<{ is
             message: `Network error: ${error.message}`
         };
     }
+}
+
+export function saveSignatureToFile(signatureHex: string, fileName: string): void {
+    const blob = new Blob([signatureHex], { type: 'text/plain' });
+    downloadBlob(blob, fileName);
+}
+
+export function readSignatureFromFile(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const content = e.target?.result as string;
+            const cleanHex = content.replace(/\s+/g, '').replace(/[^0-9A-Fa-f]/g, '');
+            resolve(cleanHex);
+        };
+        reader.onerror = () => reject('Error reading file');
+        reader.readAsText(file);
+    });
 }
 
 export function downloadBlob(blob: Blob, fileName: string): void {
